@@ -1,0 +1,23 @@
+import pandas as pd
+import numpy as np
+from sklearn import preprocessing
+from sklearn.cluster import KMeans
+
+df=pd.read_excel('C:/Segment/Segmentaciya.xlsx')
+df.head()
+df.dtypes
+
+df['Summa_uslug']=df.Summa_zakaznaryad+df.Summa_dop+df.Summa_insurance+df.Summa_TMC+df.Summa_arenda_avto
+df_cluster=df[['Summa_avto','Summa_uslug','Kolvo_avto','Year_of_last_sale']]
+df_cluster.describe()
+df_cluster=df_cluster.fillna(0)
+ar=df_cluster.values
+ar_scaled=preprocessing.scale(ar)
+kmeans=KMeans(n_clusters=11)
+kmeans.fit(ar_scaled)
+kmeans.labels_[1:20]
+unique, counts=np.unique(kmeans.labels_,return_counts=True)
+print(np.asarray((unique,counts)).T)
+
+df['cluster']=kmeans.labels_
+df.to_excel('C:/ASC_Segment/Cluster.xlsx')
