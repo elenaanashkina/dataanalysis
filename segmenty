@@ -1,0 +1,55 @@
+import pandas as pd
+import numpy as np
+# zagruzhaem dannye online prodazh
+df=pd.read_csv('C:/Online2/Online.csv',encoding='utf-8')
+df.head()
+#pereimenuem stolbcy
+df=df.rename(index=str, columns={"D951 ID": "ID", "D951-D03 Моб. телефон": "Telefon","D951-D05 E-mail":"Email","D951-D18 Полное имя":"ClientName","D058-D17 Название тарифа": "Tarif","D901 День": "Day","D003-D04 Название технологии продаж": "Technology","F004-M04 Кол-во поездок": "Passenger","D941-D02 Название станции отправления": "Station"})
+df=df[df.ID != 356234]
+df.dtypes
+df['Day']=pd.to_datetime(df['Day'])
+#-----------------------------------------------
+#Gruppirovka po klientam, Tarifu i Technoogy
+#Posledniy god
+df['LastYear'] = (np.where(df['Day'] >pd.to_datetime('2017-12-31'), np.where(df['Day'] <=pd.to_datetime('2018-12-31'), df.Passenger, 0), 0))
+df['Last2Year'] = (np.where(df['Day'] >pd.to_datetime('2016-12-31'), np.where(df['Day'] <=pd.to_datetime('2018-12-31'), df.Passenger, 0), 0))
+#gtuppiruem vseh online-klientov po ih pokupkam
+dfbin=df.groupby(by=['Email','Tarif','Technology'],as_index=False).sum().sort_values(by=['Passenger'])
+df_tarif=pd.pivot_table(dfbin,values='Passenger',index='Email',columns='Tarif',aggfunc=np.sum)
+df_tarif=df_tarif.fillna(0)
+df_tarif['Email']=df_tarif.index
+df_tarif['Biznes']=df_tarif['Бизнес']
+df_tarif['Standart']=df_tarif['Неизвестно']+df_tarif['СТАНДАРТ PAYPAL']+df_tarif['Стандарт']+df_tarif['СТАНДАРТ ВСЕ НАПРАВЛЕНИЯ']
+df_tarif['TO']=df_tarif['ТУДА-ОБРАТНО PAYPAL']+df_tarif['ТУДА-ОБРАТНО ВСЕ НАПРАВЛЕНИЯ']+df_tarif['Туда-Обратно']
+df_tarif['Tarif_segment']=np.where((df_tarif['Biznes']!=0)&(df_tarif['Standart']==0)&(df_tarif['TO']==0),'Biznes',np.where((df_tarif['Biznes']!=0)&(df_tarif['Standart']!=0)&(df_tarif['TO']==0),'Biznes_Standart',np.where((df_tarif['Biznes']!=0)&(df_tarif['Standart']==0)&(df_tarif['TO']!=0),'Biznes_TO',np.where((df_tarif['Biznes']!=0)&(df_tarif['Standart']!=0)&(df_tarif['TO']!=0),'Biznes_Standart_TO',np.where((df_tarif['Biznes']==0)&(df_tarif['Standart']!=0)&(df_tarif['TO']==0),'Standart',np.where((df_tarif['Biznes']==0)&(df_tarif['Standart']!=0)&(df_tarif['TO']!=0),'Standrt_TO','TO'))))))
+df_tarif=df_tarif[['Email','Tarif_segment']]
+dfbin=dfbin.merge(df_tarif,how='left',on='Email')
+dfbin=dfbin[['Email','Tarif_segment','Technology','Passenger','LastYear','Last2Year']]
+dfbin2=dfbin.groupby(by='Email',as_index=False).last()
+dfbin2=dfbin2[['Email','Tarif_segment']]
+dfbin3=dfbin.groupby(by='Email',as_index=False).sum()
+dfbin3['Poteri']=np.where(dfbin3.Last2Year==0,'Poteri',np.where(dfbin3.LastYear==0,'Spit','Zhivoi'))
+dfbin3=dfbin3[['Email','Passenger','LastYear','Last2Year','Poteri']]
+dfbin=dfbin2.merge(dfbin3,how='left',on='Email')
+dfbin.sort_values(by=['Passenger']).tail()
+dfbin.LastYear.sum()
+#Gruppirovka po klientam, Tarifu i Technoogy
+#-----------------------------------------------
+
+#-----------------------------------------------
+#Zagruzhaem regiony clientov
+df_region=pd.read_csv('C:/Online2/Region.csv')
+df_region=df_region[['Email','Region','Msk']]
+dfbin=dfbin.merge(df_region,how='left',on='Email')
+dfbin=dfbin[['Email','Tarif_segment','Passenger','LastYear','Last2Year','Poteri','Region','Msk']]
+dfbin.sort_values(by=['LastYear']).tail()
+#Zagruzhaem regiony clientov
+#-----------------------------------------------
+
+#-----------------------------------------------
+#Segmentaciya
+df_segment=dfbin.groupby(by=['LastYear','Msk','Poteri','Tarif_segment']).count()
+df_segment.head()
+df_segment.to_csv('C:/Online2/Segmenty_may18.txt')
+#Segmentaciya
+#-----------------------------------------------
