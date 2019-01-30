@@ -1,0 +1,1340 @@
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+import pandas as pd
+import plotly.graph_objs as go
+import datetime
+import pandas_gbq
+import dash_table
+import numpy as np
+import dash_auth
+
+KEY='''
+{}
+'''
+
+#---------------------------
+#Data preparation
+
+query='''
+select *
+from AE_weekly_report.p0
+'''
+df_week_number = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+
+#п1. Текущий год
+query='''
+select *
+from AE_weekly_report.p1
+'''
+
+df_p1 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+
+df_p1=df_p1.rename(index=str, columns={"Pokazatel": "Показатель",
+                                       "Fact_s_na4ala_goda": "Факт (с начала года)",
+                                       "Vypolnenie_Budgeta": "Выполнение Бюджета СД (с начала года), %",
+                                       "Prirost_k_2017": "Прирост к прошлому году (с начала года), %",
+                                       "Prognoz2018": "Прогноз (весь 2018 г.)",
+                                       "Vypolnenie_Budgeta_vsego2018": "Выполнение Бюджета СД (весь 2018 г.), %",
+                                       "Prirost_k_all2017": "Прирост к прошлому году (весь 2018 г.), %"})
+
+#п2. Отчетный месяц
+query='''
+select *
+from AE_weekly_report.p2
+'''
+
+df_p2 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+
+df_p2=df_p2.rename(index=str, columns={"Pokazatel": "Показатель",
+                                       "Fact_s_na4ala_mesyaca": "Факт (с начала месяца)",
+                                       "Vypolnenie_Budgeta": "Выполнение Бюджета СД (с начала месяца), %",
+                                       "Prognoz_na_mesyac": "Прогноз (отчетный месяц)",
+                                       "Budget_na_mesyac": "Бюджета СД (отчетный месяц)"})
+
+#п3. Отчетная неделя. Пасспоток аэропортов МАУ
+query='''
+select *
+from AE_weekly_report.p3
+'''
+
+df_p3 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+
+last_year_week=str(df_week_number.Week[0])+' неделя '+str(df_week_number.Year[0]-1)+' г.'
+current_year_week=str(df_week_number.Week[0])+' неделя '+str(df_week_number.Year[0])+' г.'
+
+df_p3=df_p3.rename(index=str, columns={"Airport": "Аэропорт",
+                                       "Report_week_2017": last_year_week,
+                                       "Report_week_2018": current_year_week,
+                                       "Prirost": "Прирост, %"})
+
+
+#п4. Отчетная неделя. Проданные поездки АЭ
+query='''
+select *
+from AE_weekly_report.p4
+'''
+df_p4 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+
+df_p4=df_p4.rename(index=str, columns={"Express": "Экспресс",
+                                       "Report_week_2017": last_year_week,
+                                       "Report_week_2018": current_year_week,
+                                       "Prirost": "Прирост, %"})
+
+#п5. Отчетная неделя. Продажи АЭ
+query='''
+select *
+from AE_weekly_report.p5
+'''
+df_p5 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+
+df_p5=df_p5.rename(index=str, columns={"Express": "Экспресс",
+                                       "Report_week_2017": last_year_week,
+                                       "Report_week_2018": current_year_week,
+                                       "Prirost": "Прирост, %"})
+
+#п5.2 Отчетная неделя. Приросты по технологиям
+query='''
+select *
+from AE_weekly_report.p5_2
+'''
+df_p5_2 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+
+df_p5_2=df_p5_2.rename(index=str, columns={"Express": "Экспресс",
+                                       "Report_week_2017": last_year_week,
+                                       "Report_week_2018": current_year_week,
+                                       "Prirost": "Прирост, %"})
+
+#п5.3 Отчетная неделя. Распределение по технологиям продаж
+query='''
+select *
+from AE_weekly_report.p5_3_1
+'''
+df_p5_3_1 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+
+df_p5_3_1=df_p5_3_1.sort_values(by='week_work')
+df_p5_3_1['week_work']=df_p5_3_1['week_work'].map(lambda x: 'Неделя '+ str(x%100))
+
+query='''
+select *
+from AE_weekly_report.p5_3_2
+'''
+df_p5_3_2 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+
+df_p5_3_2=df_p5_3_2.sort_values(by='week_work')
+df_p5_3_2['week_work']=df_p5_3_2['week_work'].map(lambda x: 'Неделя '+ str(x%100))
+
+data_5_3=list()
+for i in df_p5_3_1['technology'].unique():
+    data_5_3.append(
+        go.Bar(x=df_p5_3_1[df_p5_3_1['technology']==i]['week_work'],
+               y=df_p5_3_1[df_p5_3_1['technology']==i]['poezdki_x'],
+               name=i,
+               text=df_p5_3_1[df_p5_3_1['technology']==i]['poezdki_x'],
+               textposition='inside',
+               textfont=dict(
+                   #family='sans serif',
+                   size=14,
+                   #color = ('rgb(255,0,0)')
+               ),
+               hoverinfo='none'
+              )
+    )
+data_5_3.append(
+    go.Scatter(
+        x = df_p5_3_2['week_work'],
+        y = df_p5_3_2['poezdki'],
+        mode = 'lines+markers+text',
+        name = 'Проданные поездки, тыс.',
+        text=round(df_p5_3_2['poezdki'],1),
+        textposition='top center',
+        textfont=dict(
+            #family='sans serif',
+            #size=18,
+            color = ('rgb(255,0,0)')
+        ),
+        hoverinfo='none',
+        yaxis='y2',
+        line = dict(
+            color = ('rgb(255,0,0)'),
+            #width = 4,
+            #dash = 'dash'
+        )
+    )
+)
+
+layout_5_3=go.Layout(
+    barmode='stack',
+    #bargap=0.15,
+    #bargroupgap=0.1,
+    yaxis=dict(title='%',
+              range=[0,130]),
+    yaxis2=dict(
+        title='Проданные поездки, тыс.',
+        range=[0,df_p5_3_2['poezdki'].max()+20],
+        #titlefont=dict(
+        #    color='rgb(255,0,0)'
+        #),
+        overlaying='y',
+        side='right'
+    ),
+    legend=dict(orientation="h"),
+    margin=go.layout.Margin(
+      #l=0,
+      #r=0,
+      b=20,
+      t=20,
+     #pad=4
+  ),
+)
+
+    
+
+
+#п6 Отчетная неделя. Доля АЭ на рынке
+query='''
+select *
+from AE_weekly_report.p6
+'''
+df_p6 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+
+df_p6=df_p6.sort_values(by='week_work')
+df_p6['week_work']=df_p6['week_work'].map(lambda x: 'Неделя '+ str(x%100))
+
+#п7 Отчетная неделя. МБК
+query='''
+select *
+from AE_weekly_report.p7
+'''
+df_p7 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+
+#п8 Доля МБК в прилете аэропортов
+query='''
+select *
+from AE_weekly_report.p8
+'''
+df_p8 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+df_p8=df_p8.sort_values(by='week_work')
+df_p8['week_work']=df_p8['week_work'].map(lambda x: 'Неделя '+ str(x%100))
+
+
+#п9 Распределение по тарифам
+query='''
+select *
+from AE_weekly_report.p9
+'''
+df_p9 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+
+df_p9=df_p9.rename(index=str, columns={"S_na4ala_mesyaca": "Факт (с начала месяца), %",
+                                       "Dolya_tarifa": "Оперативный прогноз, %",
+                                       "tariff": "Тариф",
+                                       "Otklonenie": "Отклонение, %"})
+for i in df_p9.columns:
+    if i not in ("Факт (с начала месяца), %","Оперативный прогноз, %","Отклонение, %","Тариф"):
+        df_p9=df_p9.rename(index=str, columns={i: 'Неделя '+i[12:]+', %'})
+
+df_p9=df_p9.sort_values(by='Факт (с начала месяца), %')
+
+#Приложение1
+query='''
+select *
+from AE_weekly_report.prilozh
+'''
+df_prilozh = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+df_prilozh=df_prilozh.rename(index=str, columns={"Airport": "Направление\ Показатель",
+                                                 "BudzhetSD_poezdki": "Бюджет СД за отчетный месяц (проданные поездки, тыс.)",
+                                                 "BudzhetSD_prodagi": "Бюджет СД за отчетный месяц (продажи, млн.руб.)",
+                                                 "Forecast_poezdki": "Опер. прогноз за отчетный месяц (проданные поездки, тыс.)",
+                                                 "Forecast_prodagi": "Опер. прогноз за отчетный месяц (продажи, млн.руб.)",
+                                                 "Poezdki": "Накопительно с начала месяца (проданные поездки, тыс.)",
+                                                 "Prodagi": "Накопительно с начала месяца (продажи, млн.руб.)"
+                                                })
+
+
+#Приложение2
+query='''
+select *
+from AE_weekly_report.prilozh2
+'''
+df_prilozh2 = pd.read_gbq(query,
+                     project_id='dashboards-218617',
+                     private_key=KEY,
+                     dialect='standard',
+                     verbose=False)
+df_prilozh2=df_prilozh2.sort_values(by=['week_work','poezdki'],ascending=[True,False])
+df_prilozh2['week_work']=df_prilozh2['week_work'].map(lambda x: 'Неделя '+ str(x%100))
+                          
+
+#Data preparation
+#---------------------------
+
+
+#---------------------------
+#APP
+
+VALID_USERNAME_PASSWORD_PAIRS = [
+    ['Login', 'password']
+]
+
+app = dash.Dash()
+auth = dash_auth.BasicAuth(
+    app,
+    VALID_USERNAME_PASSWORD_PAIRS
+)
+app.title = 'Weekly dashboard'
+
+app.css.append_css({'external_url': 'https://codepen.io/chriddyp/pen/bWLwgP.css'})
+
+app.layout = html.Div([
+    html.Div([
+        dcc.Markdown('''
+        
+## Оперативный маркетинговый отчет по итогам '''+str(df_week_number.Week[0])+''' недели '''+str(df_week_number.Year[0])+''' г.
+
+В рамках настоящего отчета действуют следующие определения. 
+
+Продажи - денежные средства, полученные за фактически проданные поездки без учета возвратов за определенный период времени. \
+
+    ''')
+    ], className='twelve columns'), 
+
+    html.Div([
+        dcc.Markdown('''
+--------------------------------------------
+
+    ''')
+    ], className='twelve columns',style={'color': 'white'}),             
+
+    html.Div([
+        html.Div([
+            html.Div([
+                dcc.Markdown('''
+**1. Текущий год**
+    ''')
+            ]),
+            dash_table.DataTable(
+                id='table_p1',
+                columns=[{"name": i, "id": i} for i in df_p1.columns],
+                data=df_p1.to_dict("rows"),
+                style_cell={
+                    'minWidth': '0px', 'maxWidth': '100px',
+                    'whiteSpace': 'normal',
+                    'textAlign': 'center'
+                },
+                style_cell_conditional=[
+                    {
+                        'if': {'column_id': 'Показатель'},
+                        'textAlign': 'left'
+                    }
+                ],
+                style_as_list_view=True,                
+                css=[{
+                    'selector': '.dash-cell div.dash-cell-value',
+                    'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                }]
+            )
+        ], className='seven columns'),
+    
+    ]),    
+
+    html.Div([
+        dcc.Markdown('''
+--------------------------------------------
+
+    ''')
+    ], className='twelve columns',style={'color': 'white'}), 
+
+    html.Div([
+        html.Div([
+            html.Div([
+                dcc.Markdown('''
+**2. Отчетный месяц**
+    ''')
+            ]),
+            dash_table.DataTable(
+                id='table_p2',
+                columns=[{"name": i, "id": i} for i in df_p2.columns],
+                data=df_p2.to_dict("rows"),
+                style_cell={
+                    'minWidth': '0px', 'maxWidth': '100px',
+                    'whiteSpace': 'normal',
+                    'textAlign': 'center'
+                },
+                style_cell_conditional=[
+                    {
+                        'if': {'column_id': 'Показатель'},
+                        'textAlign': 'left'
+                    }
+                ],
+                style_as_list_view=True,                
+                css=[{
+                    'selector': '.dash-cell div.dash-cell-value',
+                    'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                }]
+            )
+        ], className='five columns'),
+    
+    ]), 
+
+    html.Div([
+        dcc.Markdown('''
+--------------------------------------------
+
+    ''')
+    ], className='twelve columns',style={'color': 'white'}),
+        
+    html.Div([
+        dcc.Markdown('''
+
+**Отчетная неделя**
+
+
+    ''')
+    ], className='twelve columns'), 
+    
+    html.Div([
+        html.Div([
+            html.Div([
+                dcc.Markdown('''
+**3. Пассажиропоток аэропортов МАУ (пасс.)**
+    ''')
+            ]),
+            html.Div([
+                dcc.Markdown('''
+--------------------------------------------
+    ''')
+            ], style={'color': 'white'}),   
+            dash_table.DataTable(
+                id='table_p3',
+                columns=[{"name": i, "id": i} for i in df_p3.columns],
+                data=df_p3.to_dict("rows"),
+                style_cell={
+                    'minWidth': '0px', 'maxWidth': '100px',
+                    'whiteSpace': 'normal',
+                    'textAlign': 'center'
+                },
+                style_cell_conditional=[
+                    {
+                        'if': {'column_id': 'Аэропорт'},
+                        'textAlign': 'left'
+                    }
+                ],
+                style_as_list_view=True,                
+                css=[{
+                    'selector': '.dash-cell div.dash-cell-value',
+                    'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                }]
+            )
+        ], className='four columns'),
+
+        html.Div([
+            dcc.Graph(id='pie_p3',
+                      #style = {'margin-top': '0', 'height': 370},
+                      figure=go.Figure(
+                          data=[go.Pie(labels=df_p3[df_p3['Аэропорт']!='МАУ']['Аэропорт'], 
+                                       values = df_p3[df_p3['Аэропорт']!='МАУ'][current_year_week],
+                                       hoverinfo='none', 
+                                       textinfo='label+value+percent',
+                                       showlegend=False,
+                                       #sort= False,
+                                       #domain= {'x': [0, 0.7], 
+                                       #         'y': [0.3, 1]}, 
+                                       #marker= {'colors': [
+                                       #    'rgb(85, 107, 47)',  # Green
+                                       #    'rgb(72, 61, 139)'  # Blue
+                                       #    'rgb(255, 165, 0)'  # Orange
+                                       #    'rgb(255, 0, 0)'
+                                       #]
+                                       #        },
+                                      )],
+                          layout=go.Layout(
+                              #title="Распределение аэропортов МАУ",
+                              #autosize=False,
+                              width=250,
+                              height=300,
+                              #yaxis=go.layout.YAxis(visible=True)
+                              margin=go.layout.Margin(
+                                  l=50,
+                                  r=0,
+                                  b=0,
+                                  t=0,
+                                  pad=4
+                              ),
+                          )
+                      )
+                     )
+        ], className='three columns')
+    
+    ]),
+    
+    html.Div([
+    ], className='twelve columns',style={'color': 'white'}),
+
+    html.Div([
+        html.Div([
+            html.Div([
+                dcc.Markdown('''
+
+**4. Количество проданных поездок АЭ (шт.)**
+    ''')
+            ]),
+            html.Div([
+                dcc.Markdown('''
+--------------------------------------------
+    ''')
+            ], style={'color': 'white'}),   
+            dash_table.DataTable(
+                id='table_p4',
+                columns=[{"name": i, "id": i} for i in df_p4.columns],
+                data=df_p4.to_dict("rows"),
+                style_cell={
+                    'minWidth': '0px', 'maxWidth': '100px',
+                    'whiteSpace': 'normal',
+                    'textAlign': 'center'
+                },
+                style_cell_conditional=[
+                    {
+                        'if': {'column_id': 'Экспресс'},
+                        'textAlign': 'left'
+                    }
+                ],
+                style_as_list_view=True,                
+                css=[{
+                    'selector': '.dash-cell div.dash-cell-value',
+                    'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                }]
+            )
+        ], className='four columns'),
+
+        html.Div([
+            dcc.Graph(id='pie_p4',
+                      #style = {'margin-top': '0', 'height': 370},
+                      figure=go.Figure(
+                          data=[go.Pie(labels=df_p4[df_p4['Экспресс']!='АЭ_МАУ']['Экспресс'], 
+                                       values = df_p4[df_p4['Экспресс']!='АЭ_МАУ'][current_year_week],
+                                       hoverinfo='none',
+                                       textinfo='label+value+percent',
+                                       showlegend=False,
+                                       #sort= False,
+                                       #domain= {'x': [0, 0.7], 
+                                       #         'y': [0.3, 1]}, 
+                                       #marker= {'colors': [
+                                       #    'rgb(85, 107, 47)',  # Green
+                                       #    'rgb(72, 61, 139)'  # Blue
+                                       #    'rgb(255, 165, 0)'  # Orange
+                                       #    'rgb(255, 0, 0)'
+                                       #]
+                                       #        },
+                                      )],
+                          layout=go.Layout(
+                              #title="Распределение аэропортов МАУ",
+                              #autosize=False,
+                              width=250,
+                              height=300,
+                              #yaxis=go.layout.YAxis(visible=True)
+                              margin=go.layout.Margin(
+                                  l=50,
+                                  r=0,
+                                  b=0,
+                                  t=0,
+                                  pad=4
+                              ),
+                          )
+                      )
+                     )
+        ], className='three columns')
+    
+    ]),
+
+
+    html.Div([
+    ], className='twelve columns',style={'color': 'white'}),
+
+    html.Div([
+        html.Div([
+            html.Div([
+                dcc.Markdown('''
+
+**5. Объем продаж АЭ (млн.руб.)**
+    ''')
+            ]),
+            html.Div([
+                dcc.Markdown('''
+--------------------------------------------
+    ''')
+            ], style={'color': 'white'}),   
+            dash_table.DataTable(
+                id='table_p5',
+                columns=[{"name": i, "id": i} for i in df_p5.columns],
+                data=df_p5.to_dict("rows"),
+                style_cell={
+                    'minWidth': '0px', 'maxWidth': '100px',
+                    'whiteSpace': 'normal',
+                    'textAlign': 'center'
+                },
+                style_cell_conditional=[
+                    {
+                        'if': {'column_id': 'Экспресс'},
+                        'textAlign': 'left'
+                    }
+                ],
+                style_as_list_view=True,                
+                css=[{
+                    'selector': '.dash-cell div.dash-cell-value',
+                    'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                }]
+            )
+        ], className='four columns'),
+
+        html.Div([
+            dcc.Graph(id='pie_p5',
+                      #style = {'margin-top': '0', 'height': 370},
+                      figure=go.Figure(
+                          data=[go.Pie(labels=df_p5[df_p5['Экспресс']!='АЭ_МАУ']['Экспресс'], 
+                                       values = df_p5[df_p5['Экспресс']!='АЭ_МАУ'][current_year_week],
+                                       hoverinfo='none',
+                                       textinfo='label+value+percent',
+                                       showlegend=False,
+                                       #sort= False,
+                                       #domain= {'x': [0, 0.7], 
+                                       #         'y': [0.3, 1]}, 
+                                       #marker= {'colors': [
+                                       #    'rgb(85, 107, 47)',  # Green
+                                       #    'rgb(72, 61, 139)'  # Blue
+                                       #    'rgb(255, 165, 0)'  # Orange
+                                       #    'rgb(255, 0, 0)'
+                                       #]
+                                       #        },
+                                      )],
+                          layout=go.Layout(
+                              #title="Распределение аэропортов МАУ",
+                              #autosize=False,
+                              width=250,
+                              height=300,
+                              #yaxis=go.layout.YAxis(visible=True)
+                              margin=go.layout.Margin(
+                                  l=50,
+                                  r=0,
+                                  b=0,
+                                  t=0,
+                                  pad=4
+                              ),
+                          )
+                      )
+                     )
+        ], className='three columns'),
+        
+        html.Div([
+            dcc.Markdown('''
+
+**Структура продаж и проданных поездок по технологиям**
+    ''')
+        ], className='twelve columns'),        
+        
+        html.Div([
+            dcc.Graph(id='barplot_p5_2',
+                      #style = {'margin-top': '0', 'height': 370},
+                      figure=go.Figure(
+                          data = [go.Bar(x=df_p5_2['technology'],
+                                         y=df_p5_2['dolya_prodagi'],
+                                         name='Продажи',
+                                         text=df_p5_2['dolya_prodagi'],
+                                         textposition='auto',
+                                         hoverinfo='none'
+                                        ),
+                                  go.Bar(x=df_p5_2['technology'],
+                                         y=df_p5_2['dolya_poezdki'],
+                                         name='Проданные поездки',
+                                         text=df_p5_2['dolya_poezdki'],
+                                         textposition='auto',
+                                         hoverinfo='none'
+                                        )
+                                 ],
+                          layout=go.Layout(
+                              bargap=0.15,
+                              bargroupgap=0.1,
+                              yaxis=dict(title='%'),
+                              legend=dict(x=0.18,y=0.95),
+                              margin=go.layout.Margin(
+                                  #l=0,
+                                  #r=0,
+                                  #b=0,
+                                  t=20,
+                                 #pad=4
+                              ),
+                          )
+                      )
+                     )
+        ], className='twelve columns'),    
+
+        html.Div([
+            dcc.Markdown('''
+
+**Динамика проданных поездок по технологиям**
+    ''')
+        ], className='twelve columns'), 
+
+        html.Div([
+            dcc.Graph(id='barplot_p5_3',
+                      #style = {'margin-top': '0', 'height': 370},
+                      figure=go.Figure(
+                          data = data_5_3,
+                          layout=layout_5_3,
+                      )
+                     )
+        ], className='twelve columns'),
+    
+    ]),
+
+    html.Div([
+    ], className='twelve columns',style={'color': 'white'}),
+
+
+    html.Div([
+        html.Div([
+            dcc.Markdown('''
+--------------------------------------------
+''')
+        ], style={'color': 'white'},className='twelve columns'),  
+        
+        html.Div([
+            dcc.Markdown('''
+
+**6. Доля Общества в пассажиропотоке МАУ**
+''')
+        ], className='twelve columns' ),
+        
+        html.Div([
+            dcc.Markdown('''
+--------------------------------------------
+''')
+        ], style={'color': 'white'}),
+        
+        html.Div([
+            dcc.Graph(id='barplot_p6_1',
+                      #style = {'margin-top': '0', 'height': 370},
+                      figure=go.Figure(
+                          data = [go.Bar(x=df_p6[(df_p6['year']=='Prior_year')&(df_p6['airport']=='МАУ')]['week_work'],
+                                         y=df_p6[(df_p6['year']=='Prior_year')&(df_p6['airport']=='МАУ')]['Dolya'],
+                                         name='2017',
+                                         text=round(df_p6[(df_p6['year']=='Prior_year')&(df_p6['airport']=='МАУ')]['Dolya'],1),
+                                         textposition='outside',
+                                         hoverinfo='none',
+                                         marker=dict(
+                                             color='rgb(139,0,0)')
+                                         ),
+                                  go.Bar(x=df_p6[(df_p6['year']=='Report_year')&(df_p6['airport']=='МАУ')]['week_work'],
+                                         y=df_p6[(df_p6['year']=='Report_year')&(df_p6['airport']=='МАУ')]['Dolya'],
+                                         name='2018',
+                                         text=round(df_p6[(df_p6['year']=='Report_year')&(df_p6['airport']=='МАУ')]['Dolya'],1),
+                                         textposition='outside',
+                                         hoverinfo='none',                                         
+                                         marker=dict(
+                                             color='rgb(255,0,0)')
+                                        )
+                                 ],
+                          layout=go.Layout(
+                              title='Динамика доли АЭ_МАУ в пасспотоке МАУ',
+                              bargap=0.15,
+                              bargroupgap=0.1,
+                              yaxis=dict(title='%',
+                                        range=[7,np.ceil(df_p6[(df_p6['airport']=='МАУ')]['Dolya'].max()+1)]),
+                              #legend=dict(x=0.18,y=0.95),
+                              margin=go.layout.Margin(
+                                  #l=0,
+                                  #r=0,
+                                  #b=0,
+                                  t=25,
+                                 #pad=4
+                              ),
+                          )
+                      )
+                     )
+        ], className='twelve columns'),     
+
+        html.Div([
+            dcc.Graph(id='barplot_p6_2',
+                      #style = {'margin-top': '0', 'height': 370},
+                      figure=go.Figure(
+                          data = [go.Bar(x=df_p6[(df_p6['year']=='Prior_year')&(df_p6['airport']=='Домодедово')]['week_work'],
+                                         y=df_p6[(df_p6['year']=='Prior_year')&(df_p6['airport']=='Домодедово')]['Dolya'],
+                                         name='2017',
+                                         text=round(df_p6[(df_p6['year']=='Prior_year')&(df_p6['airport']=='Домодедово')]['Dolya'],1),
+                                         textposition='outside',
+                                         hoverinfo='none',                                         
+                                         marker=dict(
+                                             color='rgb(0,100,0)')
+                                         ),
+                                  go.Bar(x=df_p6[(df_p6['year']=='Report_year')&(df_p6['airport']=='Домодедово')]['week_work'],
+                                         y=df_p6[(df_p6['year']=='Report_year')&(df_p6['airport']=='Домодедово')]['Dolya'],
+                                         name='2018',
+                                         text=round(df_p6[(df_p6['year']=='Report_year')&(df_p6['airport']=='Домодедово')]['Dolya'],1),
+                                         textposition='outside',
+                                         hoverinfo='none',                                          
+                                         marker=dict(
+                                             color='rgb(0,170,0)')
+                                        )
+                                 ],
+                          layout=go.Layout(
+                              title='Динамика доли АЭ_DME в пасспотоке DME',
+                              bargap=0.15,
+                              bargroupgap=0.1,
+                              yaxis=dict(title='%',
+                                        range=[7,np.ceil(df_p6[(df_p6['airport']=='Домодедово')]['Dolya'].max()+1)]),
+                              #legend=dict(x=0.18,y=0.95),
+                              margin=go.layout.Margin(
+                                  #l=0,
+                                  #r=0,
+                                  #b=0,
+                                  t=25,
+                                 #pad=4
+                              ),
+                          )
+                      )
+                     )
+        ], className='twelve columns'),    
+
+        html.Div([
+            dcc.Graph(id='barplot_p6_3',
+                      #style = {'margin-top': '0', 'height': 370},
+                      figure=go.Figure(
+                          data = [go.Bar(x=df_p6[(df_p6['year']=='Prior_year')&(df_p6['airport']=='Внуково')]['week_work'],
+                                         y=df_p6[(df_p6['year']=='Prior_year')&(df_p6['airport']=='Внуково')]['Dolya'],
+                                         name='2017',
+                                         text=round(df_p6[(df_p6['year']=='Prior_year')&(df_p6['airport']=='Внуково')]['Dolya'],1),
+                                         textposition='outside',
+                                         hoverinfo='none',                                         
+                                         marker=dict(
+                                             color='rgb(0,0,139)')
+                                         ),
+                                  go.Bar(x=df_p6[(df_p6['year']=='Report_year')&(df_p6['airport']=='Внуково')]['week_work'],
+                                         y=df_p6[(df_p6['year']=='Report_year')&(df_p6['airport']=='Внуково')]['Dolya'],
+                                         name='2018',
+                                         text=round(df_p6[(df_p6['year']=='Report_year')&(df_p6['airport']=='Внуково')]['Dolya'],1),
+                                         textposition='outside',
+                                         hoverinfo='none',                                          
+                                         marker=dict(
+                                             color='rgb(0,0,205)')
+                                        )
+                                 ],
+                          layout=go.Layout(
+                              title='Динамика доли АЭ_VKO в пасспотоке VKO',
+                              bargap=0.15,
+                              bargroupgap=0.1,
+                              yaxis=dict(title='%',
+                                        range=[7,np.ceil(df_p6[(df_p6['airport']=='Внуково')]['Dolya'].max()+1)]),
+                              #legend=dict(x=0.18,y=0.95),
+                              margin=go.layout.Margin(
+                                  #l=0,
+                                  #r=0,
+                                  #b=0,
+                                  t=25,
+                                 #pad=4
+                              ),
+                          )
+                      )
+                     )
+        ], className='twelve columns'), 
+        
+        html.Div([
+            dcc.Graph(id='barplot_p6_4',
+                      #style = {'margin-top': '0', 'height': 370},
+                      figure=go.Figure(
+                          data = [go.Bar(x=df_p6[(df_p6['year']=='Prior_year')&(df_p6['airport']=='Шереметьево')]['week_work'],
+                                         y=df_p6[(df_p6['year']=='Prior_year')&(df_p6['airport']=='Шереметьево')]['Dolya'],
+                                         name='2017',
+                                         text=round(df_p6[(df_p6['year']=='Prior_year')&(df_p6['airport']=='Шереметьево')]['Dolya'],1),
+                                         textposition='outside',
+                                         hoverinfo='none',                                         
+                                         marker=dict(
+                                             color='rgb(255,110,0)')
+                                         ),
+                                  go.Bar(x=df_p6[(df_p6['year']=='Report_year')&(df_p6['airport']=='Шереметьево')]['week_work'],
+                                         y=df_p6[(df_p6['year']=='Report_year')&(df_p6['airport']=='Шереметьево')]['Dolya'],
+                                         name='2018',
+                                         text=round(df_p6[(df_p6['year']=='Report_year')&(df_p6['airport']=='Шереметьево')]['Dolya'],1),
+                                         textposition='outside',
+                                         hoverinfo='none',                                          
+                                         marker=dict(
+                                             color='rgb(255,165,0)')
+                                        )
+                                 ],
+                          layout=go.Layout(
+                              title='Динамика доли АЭ_SVO в пасспотоке SVO',
+                              bargap=0.15,
+                              bargroupgap=0.1,
+                              yaxis=dict(title='%',
+                                        range=[7,np.ceil(df_p6[(df_p6['airport']=='Шереметьево')]['Dolya'].max()+1)]),
+                              #legend=dict(x=0.18,y=0.95),
+                              margin=go.layout.Margin(
+                                  #l=0,
+                                  #r=0,
+                                  #b=0,
+                                  t=25,
+                                 #pad=4
+                              ),
+                          )
+                      )
+                     )
+        ], className='twelve columns'),  
+        
+    ]),
+
+    html.Div([
+        html.Div([
+            html.Div([
+                dcc.Markdown('''
+
+**7.** За Отчетную неделю количество проданных поездок мобильными кассирами в аэропортах МАУ составило 
+'''+str(int(df_p7[df_p7['Week']=='report_week']['Poezdki'].sum()))+''' поездок, среднесуточно '''
+                             +str(int(round(df_p7[df_p7['Week']=='report_week']['Poezdki'].sum()/7)))+
+                             ''' поездок (неделей ранее было '''+str(int(round(df_p7[df_p7['Week']=='prior_week']['Poezdki'].sum()/7)))+''' 
+                             поездок).
+    ''')
+            ], className='twelve columns'),
+            html.Div([
+                dcc.Markdown('''
+--------------------------------------------
+    ''')
+            ], style={'color': 'white'}),  
+                ]),
+
+        html.Div([
+            dcc.Markdown('''
+--------------------------------------------
+    ''')
+        ], className='four columns', style={'color': 'white'}),
+
+        html.Div([
+            dcc.Graph(id='pie_p7',
+                      #style = {'margin-top': '0', 'height': 370},
+                      figure=go.Figure(
+                          data=[go.Pie(labels=df_p7[df_p7['Week']!='report_week']['Airport'], 
+                                       values = df_p7[df_p7['Week']!='report_week']['Poezdki'],
+                                       hoverinfo='none',
+                                       textinfo='label+value+percent',
+                                       showlegend=False,
+                                       #sort= False,
+                                       #domain= {'x': [0, 0.7], 
+                                       #         'y': [0.3, 1]}, 
+                                       marker= {'colors': [
+                                           'Blue'  # Blue
+                                           'Orange'  # Orange
+                                           'Green',  # Green
+                                       ]
+                                               },
+                                      )],
+                          layout=go.Layout(
+                              #title="Распределение аэропортов МАУ",
+                              #autosize=False,
+                              width=250,
+                              height=250,
+                              #yaxis=go.layout.YAxis(visible=True)
+                              margin=go.layout.Margin(
+                                  l=0,
+                                  r=0,
+                                  b=0,
+                                  t=0,
+                                  pad=4
+                              ),
+                          )
+                      )
+                     )
+        ], className='three columns',)
+    
+    ]),
+
+    html.Div([
+        html.Div([
+            dcc.Markdown('''
+
+**8. Совокупная доля моб. кассиров в прилёте аэропортов МАУ**
+''')
+        ], className='twelve columns' ),
+        
+        html.Div([
+            dcc.Markdown('''
+--------------------------------------------
+''')
+        ], style={'color': 'white'}),
+        
+        html.Div([
+            dcc.Graph(id='lineplot_p8',
+                      #style = {'margin-top': '0', 'height': 370},
+                      figure=go.Figure(
+                          data = [
+                              go.Scatter(
+                                  y = df_p8[df_p8['airport']=='Домодедово']['dolya_mbk'],
+                                  x = df_p8[df_p8['airport']=='Домодедово']['week_work'],
+                                  mode = 'lines+markers',
+                                  name = 'Домодедово',
+                                  text='none',
+                                  hoverinfo='name+y',
+                                  line = dict(
+                                      color = ('rgb(0,170,0)'),
+                                      #width = 4,
+                                      dash = 'dash')
+                              ),
+                              go.Scatter(
+                                  y = df_p8[df_p8['airport']=='Внуково']['dolya_mbk'],
+                                  x = df_p8[df_p8['airport']=='Внуково']['week_work'],
+                                  mode = 'lines+markers',
+                                  name = 'Внуково',
+                                  text='none',
+                                  hoverinfo='name+y',
+                                  line = dict(
+                                      color = ('rgb(0,0,205)'),
+                                      #width = 4,
+                                      dash = 'dash')
+                              ),
+                              go.Scatter(
+                                  y = df_p8[df_p8['airport']=='Шереметьево']['dolya_mbk'],
+                                  x = df_p8[df_p8['airport']=='Шереметьево']['week_work'],
+                                  mode = 'lines+markers',
+                                  name = 'Шереметьево',
+                                  text='none',
+                                  hoverinfo='name+y',
+                                  line = dict(
+                                      color = ('rgb(255,165,0)'),
+                                      #width = 4,
+                                      dash = 'dash')                                      
+                              ),
+                              go.Scatter(
+                                  y = df_p8[df_p8['airport']=='МАУ']['dolya_mbk'],
+                                  x = df_p8[df_p8['airport']=='МАУ']['week_work'],
+                                  mode = 'lines+markers+text',
+                                  name = 'МАУ',
+                                  text=df_p8[df_p8['airport']=='МАУ']['dolya_mbk'],
+                                  textposition='bottom center',
+                                  textfont=dict(
+                                      #family='sans serif',
+                                      #size=18,
+                                      color = ('rgb(255,0,0)')
+                                  ),
+                                  hoverinfo='name+y',
+                                  line = dict(
+                                      color = ('rgb(255,0,0)'),
+                                      #width = 4,
+                                      #dash = 'dash'
+                                  )
+                                  )
+                                 ],
+                          layout=go.Layout(
+                              #title='Динамика доли АЭ_МАУ в пасспотоке МАУ',
+                              yaxis=dict(title='%',
+                                        range=[1.5,np.ceil(df_p8['dolya_mbk'].max())]),
+                              #legend=dict(x=0.18,y=0.95),
+                              margin=go.layout.Margin(
+                                  #l=0,
+                                  #r=0,
+                                  #b=0,
+                                  t=25,
+                                 #pad=4
+                              ),
+                          )
+                      )
+                     )
+        ], className='twelve columns'),    
+    ]),
+
+    html.Div([
+        html.Div([
+            html.Div([
+                dcc.Markdown('''
+**9. Распределение по тарифам и средняя стоимость поездки**
+    ''')
+            ]),
+            dash_table.DataTable(
+                id='table_p9',
+                columns=[{"name": i, "id": i} for i in df_p9.columns],
+                data=df_p9.to_dict("rows"),
+                style_cell={
+                    'minWidth': '0px', 'maxWidth': '100px',
+                    'whiteSpace': 'normal',
+                    'textAlign': 'center'
+                },
+                style_data_conditional=[
+                    {
+                    "if": {"row_index": 10},
+                    "backgroundColor": "rgb(240,255,255)",
+                    'color': 'rgb(105,105,105)'
+                    },
+                ],
+                style_cell_conditional=
+                [
+                    {
+                        'if': {'row_index': 'odd'},
+                        'backgroundColor': 'rgb(248, 248, 248)'
+                    }
+                ] + 
+                [
+                    {
+                        'if': {'column_id': 'Тариф'},
+                        'textAlign': 'left'
+                    }
+                ],
+                style_as_list_view=True,                
+                css=[{
+                    'selector': '.dash-cell div.dash-cell-value',
+                    'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                }]
+            )
+        ], className='ten columns'),
+    
+    ]),       
+
+    html.Div([
+        html.Div([
+            html.Div([
+                dcc.Markdown('''
+--------------------------------------------
+    ''')
+            ], style={'color': 'white'}),  
+            html.Div([
+                dcc.Markdown('''
+**Приложение 1. Текущее выполнение плановых показателей за Отчетный месяц**
+    ''')
+            ]),
+
+            dash_table.DataTable(
+                id='table_prilozh',
+                columns=[{"name": i, "id": i} for i in df_prilozh.columns],
+                data=df_prilozh.to_dict("rows"),
+                style_cell={
+                    'minWidth': '0px', 'maxWidth': '100px',
+                    'whiteSpace': 'normal',
+                    'textAlign': 'center'
+                },
+                style_data_conditional=[
+                    {
+                    "if": {"row_index": 0},
+                    "backgroundColor": "rgb(100,149,237)",
+                    'color': 'white'
+                    },
+                    {
+                    "if": {"row_index": 1},
+                    "backgroundColor": "rgb(143,188,143)",
+                    'color': 'white'
+                    },
+                    {
+                    "if": {"row_index": 2},
+                    "backgroundColor": "rgb(255,165,0)",
+                    'color': 'white'
+                    },    
+                    {
+                    "if": {"row_index": 3},
+                    "backgroundColor": "rgb(255,99,71)",
+                    'color': 'white'
+                    },  
+                ],
+                style_cell_conditional=
+                [
+                    {
+                        'if': {'row_index': 'odd'},
+                        'backgroundColor': 'rgb(248, 248, 248)'
+                    }
+                ] + 
+                [
+                    {
+                        'if': {'column_id': 'Направление\ Показатель'},
+                        'textAlign': 'left'
+                    }
+                ],
+                #style_as_list_view=True,                
+                css=[{
+                    'selector': '.dash-cell div.dash-cell-value',
+                    'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                }]
+            )
+        ], className='ten columns'),
+        
+        html.Div([
+            dcc.Markdown('''
+--------------------------------------------
+    ''')
+        ], style={'color': 'white'}, className='twelve columns'),  
+    
+    ]),  
+
+    html.Div([
+        html.Div([
+            dcc.Markdown('''
+
+**Приложение 2. Динамика проданных поездок по выбранным тарифам и технологиям**
+''')
+        ], className='twelve columns' ),
+        
+        html.Div([
+            dcc.Markdown('''
+--------------------------------------------
+''')
+        ], style={'color': 'white'}),
+        
+        html.Div([
+            html.P('Выберите тарифы:'),
+            dcc.Dropdown(
+                id='prilozh2_dropdown1',
+                options=[{'label': k, 'value': k} for k in df_prilozh2.tariff.unique()],
+                multi=True,
+                #value="Стандарт"
+            )
+        ], className='eight columns'),
+
+        html.Div([
+            html.P('Выберите технологии продаж:'),
+            dcc.Dropdown(
+                id='prilozh2_dropdown2',
+                options=[{'label': k, 'value': k} for k in df_prilozh2.technology.unique()],
+                multi=True,
+                #value="Стационарная Касса"
+            )
+        ], className='eight columns'),
+        
+        html.Div([
+            html.P('Выберите показатель:'),
+            dcc.RadioItems(
+                id='prilozh2_radioitem1',
+                options=[
+                    {'label': 'Проданные поездки (тыс.)', 'value': 'po'},
+                    {'label': 'Продажи (млн.руб.)', 'value': 'pr'},
+                ],
+                value='po',
+                labelStyle={'display': 'inline-block'}
+            )
+        ], className='eight columns'),
+        
+        html.Div([
+            dcc.Graph(id='prilozh2_graph1',
+                      #figure=go.Figure(data=data1,layout=layout1)
+                     )
+        ], className='twelve columns'),   
+        
+    ]),
+
+
+],
+    className='ten columns offset-by-one', style={'color': 'black', 'font': 'Calibri'}
+)
+
+@app.callback(
+    dash.dependencies.Output('prilozh2_graph1', 'figure'),
+    [dash.dependencies.Input('prilozh2_dropdown1', 'value'),dash.dependencies.Input('prilozh2_dropdown2', 'value'),
+    dash.dependencies.Input('prilozh2_radioitem1', 'value')])
+def update_graph(selected_tariff,selected_technology,selected_pokazatel):
+    df_prilozh2_graph = df_prilozh2[(df_prilozh2['tariff'].isin(selected_tariff))&(df_prilozh2['technology'].isin(selected_technology))]
+    df_prilozh2_graph=df_prilozh2_graph.groupby(by=['week_work'],as_index=False).sum()
+    
+    if selected_pokazatel=='po':
+        traces = [go.Scatter(
+            x=df_prilozh2_graph['week_work'],
+            y=df_prilozh2_graph['poezdki']/1000,
+            #text=df_by_tarif['Tariff'],
+            mode='markers+lines',
+            opacity=0.7,
+            marker={
+                'size': 7,
+                'line': {'width': 0.5, 'color': 'black'}
+            }
+            )]
+        layout=go.Layout(
+            #title='Проданные поездки (тыс.)',
+            #titlefont=dict(size= 20,color='black'),
+            #xaxis={'type': 'linear','titlefont':dict(size=15,color='black'),'dtick':1,'zeroline':False},
+            yaxis={
+                'title':'тыс.поездок',
+                 #'titlefont':dict(size=18,color='black'),
+                },
+            margin={'l': 50, 'b': 40, 't': 40, 'r': 40},
+            #legend={'x': 0, 'y': 1},
+            #hovermode='closest'
+        )
+        figure=go.Figure(data=traces,layout=layout)
+        return figure
+    else:
+        traces = [go.Scatter(
+            x=df_prilozh2_graph['week_work'],
+            y=df_prilozh2_graph['prodagi']/1000000,
+            #text=df_by_tarif['Tariff'],
+            mode='markers+lines',
+            opacity=0.7,
+            marker={
+                'size': 7,
+                'line': {'width': 0.5, 'color': 'black'}
+            }
+            )]
+        layout=go.Layout(
+            #title='Проданные поездки (тыс.)',
+            #titlefont=dict(size= 20,color='black'),
+            #xaxis={'type': 'linear','titlefont':dict(size=15,color='black'),'dtick':1,'zeroline':False},
+            yaxis={
+                'title':'млн.руб.',
+                 #'titlefont':dict(size=18,color='black'),
+                },
+            margin={'l': 50, 'b': 40, 't': 40, 'r': 40},
+            #legend={'x': 0, 'y': 1},
+            #hovermode='closest'
+        )
+        figure=go.Figure(data=traces,layout=layout)
+        return figure
+
+if __name__ == '__main__':
+    app.run_server()
+
+#APP
+#---------------------------
